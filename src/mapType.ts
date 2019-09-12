@@ -2,6 +2,7 @@ import ts from 'typescript';
 import * as flow from '@babel/types';
 
 import { mapTypeParameter } from './mapTypeParameter';
+import { mapParameter } from './mapParameter';
 import { mapImportTypeNode } from './mapImportType';
 
 export function mapPropertyName(name: ts.PropertyName): flow.StringLiteral | flow.Identifier {
@@ -19,12 +20,13 @@ export function mapPropertyName(name: ts.PropertyName): flow.StringLiteral | flo
 
 export function mapPropertySignatureOrDeclaration(
     node: ts.PropertySignature | ts.PropertyDeclaration,
+    checker: ts.TypeChecker,
 ) {
     const key = mapPropertyName(node.name);
     if (!node.type) {
         throw new Error('not implemented');
     }
-    const value = mapType(node.type);
+    const value = mapType(node.type, checker);
     const variance: flow.Variance | null = null; // Typescript doesn't have variance
     const o = flow.objectTypeProperty(key, value, variance);
     o.optional = !!node.questionToken;
@@ -34,7 +36,7 @@ export function mapPropertySignatureOrDeclaration(
     return o;
 }
 
-export function mapIndexSignature(node: ts.IndexSignatureDeclaration) {
+export function mapIndexSignature(node: ts.IndexSignatureDeclaration, checker: ts.TypeChecker) {
     if (node.parameters.length !== 1) {
         throw new Error('not implemented [mapIndexSignature. parameter length mismatch]');
     }
@@ -43,46 +45,39 @@ export function mapIndexSignature(node: ts.IndexSignatureDeclaration) {
     if (!param.type) {
         throw new Error('not implemented [mapIndexSignature. no key type]');
     }
-    const key = mapType(param.type);
+    const key = mapType(param.type, checker);
     if (!node.type) {
         throw new Error('not implemented [mapIndexSignature. no value type]');
     }
-    const value = mapType(node.type);
+    const value = mapType(node.type, checker);
     return flow.objectTypeIndexer(id, key, value);
 }
 
-export function mapFunction(node: ts.SignatureDeclarationBase) {
+export function mapFunction(node: ts.SignatureDeclarationBase, checker: ts.TypeChecker) {
     if (!node.type) {
         throw new Error('not implemented');
     }
-    const returnType = mapType(node.type);
+    const returnType = checker.getTypeAtLocation(node.type).isClass()
+        ? flow.typeofTypeAnnotation(mapType(node.type, checker))
+        : mapType(node.type, checker);
     const typeParameters = node.typeParameters
         ? flow.typeParameterDeclaration(node.typeParameters.map(mapTypeParameter))
         : null;
-    const parameters = node.parameters.map(param => {
-        if (!param.type) {
-            throw new Error('not implemented');
-        }
-        const mappedParam = flow.functionTypeParam(
-            ts.isIdentifier(param.name) ? flow.identifier(param.name.text) : null,
-            mapType(param.type),
-        );
-        if (param.questionToken) {
-            mappedParam.optional = true;
-        }
-        return mappedParam;
-    });
+    const rest = node.parameters
+        .filter(x => x.dotDotDotToken)
+        .map(p => mapParameter(p, checker))[0];
+
     return flow.functionTypeAnnotation(
         typeParameters,
-        parameters,
-        null, // TODO: rest
+        node.parameters.filter(x => !x.dotDotDotToken).map(p => mapParameter(p, checker)),
+        rest,
         returnType,
     );
 }
 
-export function mapType(node: ts.TypeNode): flow.FlowType {
+export function mapType(node: ts.TypeNode, checker: ts.TypeChecker): flow.FlowType {
     if (ts.isFunctionTypeNode(node)) {
-        return mapFunction(node);
+        return mapFunction(node, checker);
     } else if (ts.isTypeReferenceNode(node)) {
         if (!ts.isIdentifier(node.typeName)) {
             throw new Error('not implemented, only identifiers supported in typeReferenceNodes');
@@ -90,7 +85,7 @@ export function mapType(node: ts.TypeNode): flow.FlowType {
         return flow.genericTypeAnnotation(
             flow.identifier(node.typeName.text),
             node.typeArguments
-                ? flow.typeParameterInstantiation(node.typeArguments.map(mapType))
+                ? flow.typeParameterInstantiation(node.typeArguments.map(x => mapType(x, checker)))
                 : null,
         );
     } else if (ts.isTypeLiteralNode(node)) {
@@ -98,9 +93,9 @@ export function mapType(node: ts.TypeNode): flow.FlowType {
         const indexers: flow.ObjectTypeIndexer[] = [];
         for (const member of node.members) {
             if (ts.isPropertySignature(member)) {
-                properties.push(mapPropertySignatureOrDeclaration(member));
+                properties.push(mapPropertySignatureOrDeclaration(member, checker));
             } else if (ts.isIndexSignatureDeclaration(member)) {
-                indexers.push(mapIndexSignature(member));
+                indexers.push(mapIndexSignature(member, checker));
             } else {
                 throw new Error(
                     `not implemented [typeLiteralNode, member] [${ts.SyntaxKind[member.kind]}]`,
@@ -120,7 +115,10 @@ export function mapType(node: ts.TypeNode): flow.FlowType {
     } else if (ts.isIndexedAccessTypeNode(node)) {
         return flow.genericTypeAnnotation(
             flow.identifier('$PropertyType'),
-            flow.typeParameterInstantiation([mapType(node.objectType), mapType(node.indexType)]),
+            flow.typeParameterInstantiation([
+                mapType(node.objectType, checker),
+                mapType(node.indexType, checker),
+            ]),
         );
     } else if (ts.isLiteralTypeNode(node)) {
         if (ts.isNumericLiteral(node.literal)) {
@@ -134,13 +132,13 @@ export function mapType(node: ts.TypeNode): flow.FlowType {
         }
         throw new Error(`not implemented [literalTypeNode, ${ts.SyntaxKind[node.kind]}`);
     } else if (ts.isArrayTypeNode(node)) {
-        return flow.arrayTypeAnnotation(mapType(node.elementType));
+        return flow.arrayTypeAnnotation(mapType(node.elementType, checker));
     } else if (ts.isUnionTypeNode(node)) {
-        return flow.unionTypeAnnotation(node.types.map(mapType));
+        return flow.unionTypeAnnotation(node.types.map(x => mapType(x, checker)));
     } else if (ts.isIntersectionTypeNode(node)) {
-        return flow.intersectionTypeAnnotation(node.types.map(mapType));
+        return flow.intersectionTypeAnnotation(node.types.map(x => mapType(x, checker)));
     } else if (ts.isImportTypeNode(node)) {
-        return mapImportTypeNode(node);
+        return mapImportTypeNode(node, checker);
     } else if (node.kind === ts.SyntaxKind.StringKeyword) {
         return flow.stringTypeAnnotation();
     } else if (node.kind === ts.SyntaxKind.BooleanKeyword) {

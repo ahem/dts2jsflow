@@ -31,7 +31,7 @@ export function collectAndMapImportTypeNodes(node: ts.Node): flow.Statement[] {
     return list;
 }
 
-export function mapImportTypeNode(node: ts.ImportTypeNode): flow.FlowType {
+export function mapImportTypeNode(node: ts.ImportTypeNode, checker: ts.TypeChecker): flow.FlowType {
     if (!node.qualifier || !ts.isIdentifier(node.qualifier)) {
         throw new Error(
             `Not implemented, only identifers can be used as qualifiers in import types`,
@@ -40,7 +40,7 @@ export function mapImportTypeNode(node: ts.ImportTypeNode): flow.FlowType {
     return flow.genericTypeAnnotation(
         flow.identifier(node.qualifier.text),
         node.typeArguments
-            ? flow.typeParameterInstantiation(node.typeArguments.map(mapType))
+            ? flow.typeParameterInstantiation(node.typeArguments.map(x => mapType(x, checker)))
             : null,
     );
 }
