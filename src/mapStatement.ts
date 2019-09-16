@@ -155,17 +155,14 @@ function mapInterfaceDeclaration(
 }
 
 function isPrivate(node: ts.Node): boolean {
-    if (
-        node.modifiers &&
+    return (
+        !!node.modifiers &&
         node.modifiers.some(
             x =>
                 x.kind === ts.SyntaxKind.PrivateKeyword ||
                 x.kind === ts.SyntaxKind.ProtectedKeyword,
         )
-    ) {
-        return true;
-    }
-    return false;
+    );
 }
 
 function mapClassDeclaration(

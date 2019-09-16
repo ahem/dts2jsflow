@@ -3,6 +3,8 @@ import * as flow from '@babel/types';
 
 import { mapTypeParameter } from './mapTypeParameter';
 import { mapParameter } from './mapParameter';
+import { mapUnionType } from './mapUnionType';
+import { mapIntersectionType } from './mapIntersectionType';
 import { mapImportTypeNode } from './mapImportType';
 
 export function mapPropertyName(name: ts.PropertyName): flow.StringLiteral | flow.Identifier {
@@ -134,9 +136,9 @@ export function mapType(node: ts.TypeNode, checker: ts.TypeChecker): flow.FlowTy
     } else if (ts.isArrayTypeNode(node)) {
         return flow.arrayTypeAnnotation(mapType(node.elementType, checker));
     } else if (ts.isUnionTypeNode(node)) {
-        return flow.unionTypeAnnotation(node.types.map(x => mapType(x, checker)));
+        return mapUnionType(node, checker);
     } else if (ts.isIntersectionTypeNode(node)) {
-        return flow.intersectionTypeAnnotation(node.types.map(x => mapType(x, checker)));
+        return mapIntersectionType(node, checker);
     } else if (ts.isImportTypeNode(node)) {
         return mapImportTypeNode(node, checker);
     } else if (node.kind === ts.SyntaxKind.StringKeyword) {
