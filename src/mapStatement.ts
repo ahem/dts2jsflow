@@ -188,7 +188,7 @@ function mapClassDeclaration(
                     flow.identifier('constructor'),
                     mapFunction(member, checker),
                 );
-                (o as any).method = true;
+                o.method = true;
                 return o;
             }
             if (ts.isMethodDeclaration(member)) {

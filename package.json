@@ -2,11 +2,9 @@
   "name": "dts2jsflow",
   "version": "1.0.0",
   "description": "",
-  "module": "lib/index.js",
-  "main": "cjs/index.js",
-  "types": "./lib/index.d.ts",
+  "bin": "./dist/index.js",
   "scripts": {
-    "clean": "rm -rf lib",
+    "clean": "rm -rf dist",
     "lint": "eslint  --ext .ts src",
     "prettier": "eslint --ext .ts --fix src",
     "build": "tsc --declaration",
@@ -17,27 +15,25 @@
   "author": "Anders Hellerup Madsen <ahem@github.com>",
   "license": "MIT",
   "dependencies": {
+    "typescript": "^3.6.3",
     "@babel/generator": "^7.6.0",
     "@babel/types": "^7.6.1"
   },
   "devDependencies": {
-    "@types/jest": "^24.0.17",
-    "@types/node": "^12.7.4",
-    "@typescript-eslint/eslint-plugin": "^2.0.0",
-    "@typescript-eslint/parser": "^2.0.0",
-    "@typescript-eslint/typescript-estree": "^2.0.0",
-    "eslint": "^6.1.0",
-    "eslint-config-prettier": "^6.0.0",
+    "@types/jest": "^24.0.18",
+    "@types/node": "^12.7.5",
+    "@typescript-eslint/eslint-plugin": "^2.3.0",
+    "@typescript-eslint/parser": "^2.3.0",
+    "@typescript-eslint/typescript-estree": "^2.3.0",
+    "eslint": "^6.4.0",
+    "eslint-config-prettier": "^6.3.0",
     "eslint-plugin-prettier": "^3.1.0",
-    "flowgen": "^1.10.0",
     "jest": "^24.9.0",
     "prettier": "^1.18.2",
-    "ts-jest": "^24.0.2",
-    "typescript": "^3.5.3"
+    "ts-jest": "^24.1.0"
   },
   "files": [
-    "lib",
-    "cjs"
+    "dist"
   ],
   "publishConfig": {
     "registry": "http://npm.issuu.com:4873/"
