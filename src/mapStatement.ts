@@ -10,7 +10,11 @@ import {
 } from './mapType';
 
 function hasExportModifier(node: ts.Node) {
-    return node.modifiers && node.modifiers.some(x => x.kind === ts.SyntaxKind.ExportKeyword);
+    return !!node.modifiers && node.modifiers.some(x => x.kind === ts.SyntaxKind.ExportKeyword);
+}
+
+function hasDefaultModifier(node: ts.Node) {
+    return !!node.modifiers && node.modifiers.some(x => x.kind === ts.SyntaxKind.DefaultKeyword);
 }
 
 function mapTypeAliasDeclaration(
@@ -62,8 +66,13 @@ function mapFunctionDeclaration(
     const id = flow.identifier(node.name.text);
     id.typeAnnotation = flow.typeAnnotation(mapFunction(node, checker));
 
-    const o = flow.declareFunction(id);
-    return hasExportModifier(node) ? flow.declareExportDeclaration(o) : o;
+    const declaration = flow.declareFunction(id);
+    if (hasExportModifier(node)) {
+        const export_ = flow.declareExportDeclaration(declaration);
+        export_.default = hasDefaultModifier(node);
+        return export_;
+    }
+    return declaration;
 }
 
 function mapImportDeclaration(
@@ -165,10 +174,7 @@ function isPrivate(node: ts.Node): boolean {
     );
 }
 
-function mapClassDeclaration(
-    node: ts.ClassDeclaration,
-    checker: ts.TypeChecker,
-): flow.DeclareClass {
+function mapClassDeclaration(node: ts.ClassDeclaration, checker: ts.TypeChecker): flow.Statement {
     if (!node.name) {
         throw new Error('not implemented [mapClassDeclaration, no name]');
     }
@@ -183,12 +189,12 @@ function mapClassDeclaration(
                         'not implemented: constructor return type with type parameters',
                     );
                 }
-                member.type = ts.createTypeReferenceNode(name, undefined); // TODO: type parameters
+                member.type = ts.createTypeReferenceNode(name, undefined);
                 const o = flow.objectTypeProperty(
                     flow.identifier('constructor'),
                     mapFunction(member, checker),
                 );
-                o.method = true;
+                (o as any).method = true; // eslint-disable-line @typescript-eslint/no-explicit-any
                 return o;
             }
             if (ts.isMethodDeclaration(member)) {
@@ -224,7 +230,14 @@ function mapClassDeclaration(
         ? flow.typeParameterDeclaration(node.typeParameters.map(mapTypeParameter))
         : null;
     const extends_: Array<flow.InterfaceExtends> | null | undefined = []; // TODO
-    return flow.declareClass(id, typeParameters, extends_, body);
+
+    const declaration = flow.declareClass(id, typeParameters, extends_, body);
+    if (hasExportModifier(node)) {
+        const export_ = flow.declareExportDeclaration(declaration);
+        export_.default = hasDefaultModifier(node);
+        return export_;
+    }
+    return declaration;
 }
 
 function mapExportDeclaration(node: ts.ExportDeclaration): flow.Statement | flow.Statement[] {

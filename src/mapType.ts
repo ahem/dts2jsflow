@@ -59,9 +59,7 @@ export function mapFunction(node: ts.SignatureDeclarationBase, checker: ts.TypeC
     if (!node.type) {
         throw new Error('not implemented');
     }
-    const returnType = checker.getTypeAtLocation(node.type).isClass()
-        ? flow.typeofTypeAnnotation(mapType(node.type, checker))
-        : mapType(node.type, checker);
+    const returnType = mapType(node.type, checker);
     const typeParameters = node.typeParameters
         ? flow.typeParameterDeclaration(node.typeParameters.map(mapTypeParameter))
         : null;
