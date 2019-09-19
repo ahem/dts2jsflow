@@ -12,7 +12,8 @@
     "build": "tsc --declaration",
     "pretest": "yarn",
     "test": "yarn lint && jest",
-    "prepublish": "yarn build"
+    "install": "yarn build",
+    "prepublishOnly": "yarn build"
   },
   "author": "Anders Hellerup Madsen <ahem@github.com>",
   "license": "MIT",

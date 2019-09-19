@@ -4,13 +4,13 @@ import generate from '@babel/generator';
 import { mapStatement } from './mapStatement';
 import { collectAndMapImportTypeNodes } from './mapImportType';
 import { writeFileSync, readdirSync, statSync } from 'fs';
-import { join as joinPath } from 'path';
+import { join as joinPath, resolve } from 'path';
 
 function listFiles(dir: string, pattern: RegExp): string[] {
     const files = readdirSync(dir);
     return files.reduce(
         (acc, filename) => {
-            const path = joinPath(dir, filename);
+            const path = resolve(joinPath(dir, filename));
             if (statSync(path).isDirectory()) {
                 return acc.concat(listFiles(path, pattern));
             }
