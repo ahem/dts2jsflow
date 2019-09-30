@@ -2,6 +2,7 @@ import ts from 'typescript';
 import * as flow from '@babel/types';
 
 import { mapType } from './mapType';
+import { NotImplementedError } from './error';
 
 export function collectAndMapImportTypeNodes(node: ts.Node): flow.Statement[] {
     const list: flow.ImportDeclaration[] = [];
@@ -12,11 +13,12 @@ export function collectAndMapImportTypeNodes(node: ts.Node): flow.Statement[] {
                 !ts.isLiteralTypeNode(node.argument) ||
                 !ts.isStringLiteral(node.argument.literal)
             ) {
-                throw new Error('not implemented');
+                throw new NotImplementedError(node);
             }
             if (!node.qualifier || !ts.isIdentifier(node.qualifier)) {
-                throw new Error(
-                    `Not implemented, only identifers can be used as qualifiers in import types`,
+                throw new NotImplementedError(
+                    node,
+                    'only identifers can be used as qualifiers in import types',
                 );
             }
             const source = flow.stringLiteral(node.argument.literal.text);
@@ -33,8 +35,9 @@ export function collectAndMapImportTypeNodes(node: ts.Node): flow.Statement[] {
 
 export function mapImportTypeNode(node: ts.ImportTypeNode, checker: ts.TypeChecker): flow.FlowType {
     if (!node.qualifier || !ts.isIdentifier(node.qualifier)) {
-        throw new Error(
-            `Not implemented, only identifers can be used as qualifiers in import types`,
+        throw new NotImplementedError(
+            node,
+            'only identifers can be used as qualifiers in import types',
         );
     }
     return flow.genericTypeAnnotation(

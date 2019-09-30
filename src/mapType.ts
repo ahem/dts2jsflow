@@ -6,6 +6,7 @@ import { mapParameter } from './mapParameter';
 import { mapUnionType } from './mapUnionType';
 import { mapIntersectionType } from './mapIntersectionType';
 import { mapImportTypeNode } from './mapImportType';
+import { NotImplementedError } from './error';
 
 export function mapPropertyName(name: ts.PropertyName): flow.StringLiteral | flow.Identifier {
     if (ts.isIdentifier(name)) {
@@ -17,7 +18,7 @@ export function mapPropertyName(name: ts.PropertyName): flow.StringLiteral | flo
     if (ts.isNumericLiteral(name)) {
         return flow.stringLiteral(name.text);
     }
-    throw new Error('not implemented');
+    throw new NotImplementedError(name, 'computed property name');
 }
 
 export function mapPropertySignatureOrDeclaration(
@@ -26,7 +27,7 @@ export function mapPropertySignatureOrDeclaration(
 ) {
     const key = mapPropertyName(node.name);
     if (!node.type) {
-        throw new Error('not implemented');
+        throw new NotImplementedError(node);
     }
     const value = mapType(node.type, checker);
     const variance: flow.Variance | null = null; // Typescript doesn't have variance
@@ -40,16 +41,16 @@ export function mapPropertySignatureOrDeclaration(
 
 export function mapIndexSignature(node: ts.IndexSignatureDeclaration, checker: ts.TypeChecker) {
     if (node.parameters.length !== 1) {
-        throw new Error('not implemented [mapIndexSignature. parameter length mismatch]');
+        throw new NotImplementedError(node, 'parameter length mismatch');
     }
     const param = node.parameters[0];
     const id = param.name && ts.isIdentifier(param.name) ? flow.identifier(param.name.text) : null;
     if (!param.type) {
-        throw new Error('not implemented [mapIndexSignature. no key type]');
+        throw new NotImplementedError(param, 'no key type');
     }
     const key = mapType(param.type, checker);
     if (!node.type) {
-        throw new Error('not implemented [mapIndexSignature. no value type]');
+        throw new NotImplementedError(param, 'no value type');
     }
     const value = mapType(node.type, checker);
     return flow.objectTypeIndexer(id, key, value);
@@ -57,7 +58,7 @@ export function mapIndexSignature(node: ts.IndexSignatureDeclaration, checker: t
 
 export function mapFunction(node: ts.SignatureDeclarationBase, checker: ts.TypeChecker) {
     if (!node.type) {
-        throw new Error('not implemented');
+        throw new NotImplementedError(node, 'function with no declared return type');
     }
     const returnType = mapType(node.type, checker);
     const typeParameters = node.typeParameters
@@ -80,7 +81,7 @@ export function mapType(node: ts.TypeNode, checker: ts.TypeChecker): flow.FlowTy
         return mapFunction(node, checker);
     } else if (ts.isTypeReferenceNode(node)) {
         if (!ts.isIdentifier(node.typeName)) {
-            throw new Error('not implemented, only identifiers supported in typeReferenceNodes');
+            throw new NotImplementedError(node, 'only identifiers supported in typeReferenceNodes');
         }
         return flow.genericTypeAnnotation(
             flow.identifier(node.typeName.text),
@@ -97,9 +98,7 @@ export function mapType(node: ts.TypeNode, checker: ts.TypeChecker): flow.FlowTy
             } else if (ts.isIndexSignatureDeclaration(member)) {
                 indexers.push(mapIndexSignature(member, checker));
             } else {
-                throw new Error(
-                    `not implemented [typeLiteralNode, member] [${ts.SyntaxKind[member.kind]}]`,
-                );
+                throw new NotImplementedError(node);
             }
         }
         const callProperties: Array<flow.ObjectTypeCallProperty> | null = null;
@@ -130,7 +129,7 @@ export function mapType(node: ts.TypeNode, checker: ts.TypeChecker): flow.FlowTy
         } else if (node.literal.kind === ts.SyntaxKind.FalseKeyword) {
             return flow.booleanLiteralTypeAnnotation(false);
         }
-        throw new Error(`not implemented [literalTypeNode, ${ts.SyntaxKind[node.kind]}`);
+        throw new NotImplementedError(node);
     } else if (ts.isArrayTypeNode(node)) {
         return flow.arrayTypeAnnotation(mapType(node.elementType, checker));
     } else if (ts.isUnionTypeNode(node)) {
@@ -156,6 +155,6 @@ export function mapType(node: ts.TypeNode, checker: ts.TypeChecker): flow.FlowTy
     } else if (node.kind === ts.SyntaxKind.NullKeyword) {
         return flow.nullLiteralTypeAnnotation();
     } else {
-        throw new Error(`mapType, not implemented: ${ts.SyntaxKind[node.kind]}`);
+        throw new NotImplementedError(node);
     }
 }

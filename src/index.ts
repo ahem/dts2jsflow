@@ -5,6 +5,7 @@ import { mapStatement } from './mapStatement';
 import { collectAndMapImportTypeNodes } from './mapImportType';
 import { writeFileSync, readdirSync, statSync } from 'fs';
 import { join as joinPath, resolve } from 'path';
+import { NotImplementedError } from './error';
 
 function listFiles(dir: string, pattern: RegExp): string[] {
     const files = readdirSync(dir);
@@ -56,28 +57,40 @@ function main(root: string) {
     const program = ts.createProgram(fileNames, {});
     const checker = program.getTypeChecker();
 
-    for (const sourceFile of program.getSourceFiles()) {
-        if (!fileNames.includes(sourceFile.fileName)) {
-            continue;
+    try {
+        for (const sourceFile of program.getSourceFiles()) {
+            if (!fileNames.includes(sourceFile.fileName)) {
+                continue;
+            }
+            console.log(`processing ${sourceFile.fileName}...`);
+            let list: flow.Statement[] = [];
+            ts.forEachChild(sourceFile, node => {
+                if (node.kind === ts.SyntaxKind.EndOfFileToken) {
+                    return;
+                }
+                list.push(...collectAndMapImportTypeNodes(node));
+                const result = mapStatement(node, checker);
+                if (Array.isArray(result)) {
+                    list.push(...result);
+                } else {
+                    list.push(result);
+                }
+            });
+            list = removeDuplicateImports(list);
+            const output = '// @flow\n' + generate(flow.program(list, undefined, 'module')).code;
+            const outputFilename = sourceFile.fileName.replace(/.d.ts$/, '.js.flow');
+            writeFileSync(outputFilename, output, { encoding: 'utf-8' });
         }
-        console.log(`processing ${sourceFile.fileName}...`);
-        let list: flow.Statement[] = [];
-        ts.forEachChild(sourceFile, node => {
-            if (node.kind === ts.SyntaxKind.EndOfFileToken) {
-                return;
-            }
-            list.push(...collectAndMapImportTypeNodes(node));
-            const result = mapStatement(node, checker);
-            if (Array.isArray(result)) {
-                list.push(...result);
-            } else {
-                list.push(result);
-            }
-        });
-        list = removeDuplicateImports(list);
-        const output = '// @flow\n' + generate(flow.program(list, undefined, 'module')).code;
-        const outputFilename = sourceFile.fileName.replace(/.d.ts$/, '.js.flow');
-        writeFileSync(outputFilename, output, { encoding: 'utf-8' });
+    } catch (err) {
+        if (err instanceof NotImplementedError) {
+            console.error(
+                `NotImplementedError${err.message ? `: ${err.message}` : ''} at ${err.fileName}:${
+                    err.line
+                }:${err.character}`,
+            );
+            // TODO: provide option to dump stack
+        }
+        throw err;
     }
 }
 

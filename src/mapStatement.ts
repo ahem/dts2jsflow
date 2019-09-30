@@ -8,6 +8,7 @@ import {
     mapPropertySignatureOrDeclaration,
     mapFunction,
 } from './mapType';
+import { NotImplementedError } from './error';
 
 function hasExportModifier(node: ts.Node) {
     return !!node.modifiers && node.modifiers.some(x => x.kind === ts.SyntaxKind.ExportKeyword);
@@ -37,7 +38,7 @@ function mapVariableStatement(
 ): flow.Statement[] {
     return node.declarationList.declarations.map(decl => {
         if (!ts.isIdentifier(decl.name)) {
-            throw new Error('not implemented');
+            throw new NotImplementedError(node);
         }
         let typ: flow.FlowType;
         if (decl.type) {
@@ -47,7 +48,7 @@ function mapVariableStatement(
         } else if (decl.initializer && ts.isNumericLiteral(decl.initializer)) {
             typ = flow.numberLiteralTypeAnnotation(Number(decl.initializer.text));
         } else {
-            throw new Error('not implemented');
+            throw new NotImplementedError(node);
         }
         const id = flow.identifier(decl.name.text);
         id.typeAnnotation = flow.typeAnnotation(typ);
@@ -61,7 +62,7 @@ function mapFunctionDeclaration(
     checker: ts.TypeChecker,
 ): flow.Statement {
     if (!node.name) {
-        throw new Error('not implemented');
+        throw new NotImplementedError(node);
     }
     const id = flow.identifier(node.name.text);
     id.typeAnnotation = flow.typeAnnotation(mapFunction(node, checker));
@@ -80,7 +81,7 @@ function mapImportDeclaration(
     checker: ts.TypeChecker,
 ): flow.ImportDeclaration[] {
     if (!node.importClause) {
-        throw new Error('not implemented');
+        throw new NotImplementedError(node);
     }
     const valueImports: (
         | flow.ImportSpecifier
@@ -102,7 +103,7 @@ function mapImportDeclaration(
             for (const element of node.importClause.namedBindings.elements) {
                 if (element.propertyName) {
                     // in this case `propertyName` is import, and `name` is local name
-                    throw new Error('not implemented [local name of import]');
+                    throw new NotImplementedError(node, 'local name of import');
                 }
                 const localName = flow.identifier(element.name.text);
                 const importName = flow.identifier(element.name.text);
@@ -117,7 +118,7 @@ function mapImportDeclaration(
         }
     }
     if (!ts.isStringLiteral(node.moduleSpecifier)) {
-        throw new Error('not implemented');
+        throw new NotImplementedError(node);
     }
     const source = flow.stringLiteral(node.moduleSpecifier.text);
     const result: flow.ImportDeclaration[] = [];
@@ -141,7 +142,7 @@ function mapInterfaceDeclaration(
         if (ts.isPropertySignature(member)) {
             return mapPropertySignatureOrDeclaration(member, checker);
         }
-        throw new Error(`not implemented interface member [${ts.SyntaxKind[member.kind]}]`);
+        throw new NotImplementedError(node, 'interface member');
     });
     const indexers: Array<flow.ObjectTypeIndexer> | null = null; // TODO
     const callProperties: Array<flow.ObjectTypeCallProperty> | null = null; // ???
@@ -176,7 +177,7 @@ function isPrivate(node: ts.Node): boolean {
 
 function mapClassDeclaration(node: ts.ClassDeclaration, checker: ts.TypeChecker): flow.Statement {
     if (!node.name) {
-        throw new Error('not implemented [mapClassDeclaration, no name]');
+        throw new NotImplementedError(node, 'no name');
     }
     const name = node.name;
     const id = flow.identifier(name.text);
@@ -185,8 +186,9 @@ function mapClassDeclaration(node: ts.ClassDeclaration, checker: ts.TypeChecker)
         .map(member => {
             if (ts.isConstructorDeclaration(member)) {
                 if (node.typeParameters) {
-                    throw new Error(
-                        'not implemented: constructor return type with type parameters',
+                    throw new NotImplementedError(
+                        node,
+                        'constructor return type with type parameters',
                     );
                 }
                 member.type = ts.createTypeReferenceNode(name, undefined);
@@ -206,12 +208,10 @@ function mapClassDeclaration(node: ts.ClassDeclaration, checker: ts.TypeChecker)
             if (ts.isPropertyDeclaration(member)) {
                 return mapPropertySignatureOrDeclaration(member, checker);
             }
-            throw new Error(
-                `not implemented class member declaration [${ts.SyntaxKind[member.kind]}]`,
-            );
+            throw new NotImplementedError(node, 'class member declaration');
         });
     if (node.members.some(ts.isIndexSignatureDeclaration)) {
-        throw new Error('not implemented: indexers not supported in class');
+        throw new NotImplementedError(node, 'indexers not supported in class');
     }
     const indexers: Array<flow.ObjectTypeIndexer> | null = null; // TODO
     const callProperties: Array<flow.ObjectTypeCallProperty> | null = null; // ???
@@ -247,7 +247,7 @@ function mapExportDeclaration(node: ts.ExportDeclaration): flow.Statement | flow
     const exportSpecifiers = node.exportClause.elements.map(element => {
         if (element.propertyName) {
             // in this case `propertyName` is import, and `name` is local name
-            throw new Error('not implemented [local name of import]');
+            throw new NotImplementedError(node, 'local name of import');
         }
         const id = flow.identifier(element.name.text);
         return flow.exportSpecifier(id, id);
@@ -255,7 +255,7 @@ function mapExportDeclaration(node: ts.ExportDeclaration): flow.Statement | flow
     const declaration = flow.declareExportDeclaration(null, exportSpecifiers);
     if (node.moduleSpecifier) {
         if (!ts.isStringLiteral(node.moduleSpecifier)) {
-            throw new Error('not implemented');
+            throw new NotImplementedError(node);
         }
         declaration.source = flow.stringLiteral(node.moduleSpecifier.text);
     }
@@ -281,6 +281,6 @@ export function mapStatement(
     } else if (ts.isClassDeclaration(node)) {
         return mapClassDeclaration(node, checker);
     } else {
-        throw new Error(`mapDeclaration, not implemented: ${ts.SyntaxKind[node.kind]}`);
+        throw new NotImplementedError(node);
     }
 }
