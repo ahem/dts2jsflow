@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import ts from 'typescript';
 import * as flow from '@babel/types';
 import generate from '@babel/generator';
@@ -6,6 +7,7 @@ import { collectAndMapImportTypeNodes } from './mapImportType';
 import { writeFileSync, readdirSync, statSync } from 'fs';
 import { join as joinPath, resolve } from 'path';
 import { NotImplementedError } from './error';
+import yargs from 'yargs';
 
 function listFiles(dir: string, pattern: RegExp): string[] {
     const files = readdirSync(dir);
@@ -51,7 +53,7 @@ function removeDuplicateImports(nodes: flow.Statement[]) {
     return list;
 }
 
-function main(root: string) {
+function main(root: string, options: { debug?: boolean }) {
     const fileNames = listFiles(root, /\.d\.ts$/);
 
     const program = ts.createProgram(fileNames, {});
@@ -86,16 +88,24 @@ function main(root: string) {
             console.error(
                 `NotImplementedError${err.message ? `: ${err.message}` : ''} at ${err.fileName}:${
                     err.line
-                }:${err.character}`,
+                }:${err.character}\n`,
             );
-            // TODO: provide option to dump stack
+            if (options.debug && err.stack) {
+                console.error(err.stack);
+            }
+        } else {
+            throw err;
         }
-        throw err;
     }
 }
 
-if (process.argv && process.argv[2]) {
-    main(process.argv[2]);
-} else {
-    console.error(`usage: node ${__filename} <INPUT_DIRECTORY>`);
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const argv: any = yargs
+    .command('$0 <dir>', 'convert typescript declaration files to Flow declarations', yargs =>
+        yargs.positional('dir', { description: 'directory to process' }).options({
+            debug: { type: 'boolean', default: false, description: 'enable debug output' },
+        }),
+    )
+    .help().argv;
+
+main(argv.dir, { debug: !!argv.debug });

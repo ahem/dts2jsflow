@@ -1,15 +1,15 @@
 {
   "name": "dts2jsflow",
   "version": "1.0.0",
-  "description": "",
+  "description": "Parse typescript declaration files (.d.ts) and turn them into Flow declaration files (.js.flow)",
   "bin": {
-      "dts2jsflow": "./dist/index.js"
+    "dts2jsflow": "./dist/index.js"
   },
   "scripts": {
     "clean": "rm -rf dist",
     "lint": "eslint  --ext .ts src",
     "prettier": "eslint --ext .ts --fix src",
-    "build": "tsc --declaration",
+    "build": "tsc --declaration && chmod +x dist/index.js",
     "pretest": "yarn",
     "test": "yarn lint && jest",
     "install": "yarn build",
@@ -18,13 +18,15 @@
   "author": "Anders Hellerup Madsen <ahem@github.com>",
   "license": "MIT",
   "dependencies": {
-    "typescript": "^3.6.3",
     "@babel/generator": "^7.6.0",
-    "@babel/types": "^7.6.1"
+    "@babel/types": "^7.6.1",
+    "typescript": "^3.6.3",
+    "yargs": "^14.0.0"
   },
   "devDependencies": {
     "@types/jest": "^24.0.18",
     "@types/node": "^12.7.5",
+    "@types/yargs": "^13.0.3",
     "@typescript-eslint/eslint-plugin": "^2.3.0",
     "@typescript-eslint/parser": "^2.3.0",
     "@typescript-eslint/typescript-estree": "^2.3.0",
