@@ -86,9 +86,9 @@ function main(root: string, options: { debug?: boolean }) {
     } catch (err) {
         if (err instanceof NotImplementedError) {
             console.error(
-                `NotImplementedError${err.message ? `: ${err.message}` : ''} at ${err.fileName}:${
-                    err.line
-                }:${err.character}\n`,
+                `NotImplementedError${err.message ? `: ${err.message}` : ''} while parsing ${
+                    err.nodeKind
+                } at ${err.fileName}:${err.line}:${err.character}\n`,
             );
             if (options.debug && err.stack) {
                 console.error(err.stack);

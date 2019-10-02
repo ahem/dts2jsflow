@@ -1,5 +1,6 @@
 import ts from 'typescript';
 import * as flow from '@babel/types';
+import { mapWellKnownImports } from './mapWellKnownImports';
 
 import { mapTypeParameter } from './mapTypeParameter';
 import {
@@ -81,7 +82,8 @@ function mapImportDeclaration(
     checker: ts.TypeChecker,
 ): flow.ImportDeclaration[] {
     if (!node.importClause) {
-        throw new NotImplementedError(node);
+        // wo don't really care about module imports (eg. `import 'isomorphic-fetch';`), so skip those.
+        return [];
     }
     const valueImports: (
         | flow.ImportSpecifier
@@ -95,6 +97,11 @@ function mapImportDeclaration(
         const id = flow.identifier(node.importClause.name.text);
         valueImports.push(flow.importDefaultSpecifier(id));
     }
+    if (!ts.isStringLiteral(node.moduleSpecifier)) {
+        throw new NotImplementedError(node);
+    }
+    const source = flow.stringLiteral(node.moduleSpecifier.text);
+
     if (node.importClause.namedBindings) {
         if (ts.isNamespaceImport(node.importClause.namedBindings)) {
             const id = flow.identifier(node.importClause.namedBindings.name.text);
@@ -106,7 +113,9 @@ function mapImportDeclaration(
                     throw new NotImplementedError(node, 'local name of import');
                 }
                 const localName = flow.identifier(element.name.text);
-                const importName = flow.identifier(element.name.text);
+                const importName = flow.identifier(
+                    mapWellKnownImports(source.value, element.name.text),
+                );
                 const sym = checker.getSymbolAtLocation(element.name);
                 const typ = sym && checker.typeToTypeNode(checker.getDeclaredTypeOfSymbol(sym));
                 if (typ && typ.kind === ts.SyntaxKind.TypeReference) {
@@ -117,10 +126,6 @@ function mapImportDeclaration(
             }
         }
     }
-    if (!ts.isStringLiteral(node.moduleSpecifier)) {
-        throw new NotImplementedError(node);
-    }
-    const source = flow.stringLiteral(node.moduleSpecifier.text);
     const result: flow.ImportDeclaration[] = [];
     if (valueImports.length > 0) {
         result.push(flow.importDeclaration(valueImports, source));
@@ -241,6 +246,9 @@ function mapClassDeclaration(node: ts.ClassDeclaration, checker: ts.TypeChecker)
 }
 
 function mapExportDeclaration(node: ts.ExportDeclaration): flow.Statement | flow.Statement[] {
+    if (!node.exportClause && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
+        return flow.exportAllDeclaration(flow.stringLiteral(node.moduleSpecifier.text));
+    }
     if (!node.exportClause || node.exportClause.elements.length === 0) {
         return [];
     }
@@ -280,6 +288,11 @@ export function mapStatement(
         return mapInterfaceDeclaration(node, checker);
     } else if (ts.isClassDeclaration(node)) {
         return mapClassDeclaration(node, checker);
+    } else if (ts.isExportAssignment(node)) {
+        if (!ts.isIdentifier(node.expression)) {
+            throw new NotImplementedError(node, 'only identifiers supported');
+        }
+        return flow.exportDefaultDeclaration(flow.identifier(node.expression.text));
     } else {
         throw new NotImplementedError(node);
     }

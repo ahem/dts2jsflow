@@ -83,6 +83,12 @@ export function mapType(node: ts.TypeNode, checker: ts.TypeChecker): flow.FlowTy
         if (!ts.isIdentifier(node.typeName)) {
             throw new NotImplementedError(node, 'only identifiers supported in typeReferenceNodes');
         }
+        if (node.typeName.text === 'Partial' && node.typeArguments) {
+            return flow.genericTypeAnnotation(
+                flow.identifier('$Shape'),
+                flow.typeParameterInstantiation(node.typeArguments.map(x => mapType(x, checker))),
+            );
+        }
         return flow.genericTypeAnnotation(
             flow.identifier(node.typeName.text),
             node.typeArguments
@@ -130,6 +136,16 @@ export function mapType(node: ts.TypeNode, checker: ts.TypeChecker): flow.FlowTy
             return flow.booleanLiteralTypeAnnotation(false);
         }
         throw new NotImplementedError(node);
+    } else if (ts.isTypeQueryNode(node)) {
+        if (!ts.isIdentifier(node.exprName)) {
+            throw new NotImplementedError(
+                node,
+                'only identifiers supported in typeof / type query',
+            );
+        }
+        return flow.typeofTypeAnnotation(
+            flow.genericTypeAnnotation(flow.identifier(node.exprName.text)),
+        );
     } else if (ts.isArrayTypeNode(node)) {
         return flow.arrayTypeAnnotation(mapType(node.elementType, checker));
     } else if (ts.isUnionTypeNode(node)) {
